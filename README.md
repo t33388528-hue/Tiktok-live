@@ -15,7 +15,7 @@ The connector depends on TikTok's unofficial, reverse-engineered LIVE interface 
 
 Create an incoming webhook in the Discord channel where you want LIVE updates, then set its URL as `DISCORD_WEBHOOK_URL` in the Render service's environment settings. The URL is a secret; do not commit it to the repository. The Render Blueprint marks it as a value to enter during initial setup.
 
-By default, Discord receives chat, gift, member, social, subscription, and stream-end events from the configured TikTok LIVE connection. Set `DISCORD_EVENTS` to a comma-separated list of event names to customize this (for example, `chat,gift,like`). Mentions from LIVE content are disabled so event text cannot trigger Discord pings.
+By default, Discord receives a linked LIVE alert when the creator connection succeeds, plus gift, social, subscription, and stream-end events. Chat and member events are not sent to Discord by default. Set `DISCORD_EVENTS` to a comma-separated list of additional event names to customize this. Mentions from LIVE content are disabled so event text cannot trigger Discord pings.
 
 ## API
 
