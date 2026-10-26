@@ -7,7 +7,7 @@ A small HTTP and Server-Sent Events wrapper around the unofficial [tiktok-live-c
 1. In Render, create a Blueprint from this GitHub repository; Render reads render.yaml to configure the web service.
 2. Render installs dependencies with npm install and starts the API with npm start.
 3. render.yaml generates a random API_KEY for bearer authentication. You can replace it in the Render Dashboard. /health stays public for Render health checks.
-4. Optionally set MAX_CONNECTIONS (default 10). Render supplies PORT automatically.
+4. `AUTO_CONNECT_USERNAME` is set to `ChilledLuck`, so the service attempts to connect to `@ChilledLuck` after each startup. Change or clear it in Render to select a different creator or disable auto-connect. `MAX_CONNECTIONS` defaults to 10, and Render supplies `PORT` automatically.
 
 The connector depends on TikTok's unofficial, reverse-engineered LIVE interface and a third-party signing provider. TikTok may change it, and availability is not guaranteed. This service reads public LIVE events; it does not implement login or chat sending.
 
