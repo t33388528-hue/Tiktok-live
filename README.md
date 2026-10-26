@@ -1,4 +1,4 @@
-# TikTok LIVE API for Railway
+# TikTok LIVE API for Render
 
 A small HTTP and Server-Sent Events wrapper around the unofficial [tiktok-live-connector](https://www.npmjs.com/package/tiktok-live-connector) library. It connects to public TikTok LIVE rooms by username and streams events to your client.
 
