@@ -11,6 +11,12 @@ A small HTTP and Server-Sent Events wrapper around the unofficial [tiktok-live-c
 
 The connector depends on TikTok's unofficial, reverse-engineered LIVE interface and a third-party signing provider. TikTok may change it, and availability is not guaranteed. This service reads public LIVE events; it does not implement login or chat sending.
 
+## Discord webhook
+
+Create an incoming webhook in the Discord channel where you want LIVE updates, then set its URL as `DISCORD_WEBHOOK_URL` in the Render service's environment settings. The URL is a secret; do not commit it to the repository. The Render Blueprint marks it as a value to enter during initial setup.
+
+By default, Discord receives chat, gift, member, social, subscription, and stream-end events from the configured TikTok LIVE connection. Set `DISCORD_EVENTS` to a comma-separated list of event names to customize this (for example, `chat,gift,like`). Mentions from LIVE content are disabled so event text cannot trigger Discord pings.
+
 ## API
 
 All API routes require the bearer key when API_KEY is set.
