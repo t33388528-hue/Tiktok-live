@@ -117,7 +117,21 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(400).json({ error: 'Invalid request' });
 });
-const server = app.listen(port, '0.0.0.0', () => console.log(`TikTok LIVE API listening on ${port}`));
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`TikTok LIVE API listening on ${port}`);
+  const autoConnectUsername = normalizeUsername(process.env.AUTO_CONNECT_USERNAME);
+  if (autoConnectUsername) {
+    setTimeout(async () => {
+      try {
+        const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+        const response = await fetch(`http://127.0.0.1:${port}/api/live/${encodeURIComponent(autoConnectUsername)}/connect`, { method: 'POST', headers });
+        if (!response.ok) console.error(`Startup connection to @${autoConnectUsername} failed:`, await response.text());
+      } catch (error) {
+        console.error(`Startup connection to @${autoConnectUsername} failed:`, error);
+      }
+    }, 0);
+  }
+});
 
 async function shutdown() {
   server.close();
