@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tiktok-live-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: API_KEY
+        generateValue: true
+      - key: MAX_CONNECTIONS
+        value: "10"
