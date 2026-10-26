@@ -12,3 +12,5 @@ services:
         value: "10"
       - key: AUTO_CONNECT_USERNAME
         value: ChilledLuck
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
