@@ -10,3 +10,5 @@ services:
         generateValue: true
       - key: MAX_CONNECTIONS
         value: "10"
+      - key: AUTO_CONNECT_USERNAME
+        value: ChilledLuck
