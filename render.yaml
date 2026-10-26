@@ -12,5 +12,5 @@ services:
         value: "10"
       - key: AUTO_CONNECT_USERNAME
         value: ChilledLuck
-      - key: DISCORD_WEBHOOK_URL
+      - key: https://discord.com/api/webhooks/1564198869087166475/cn3V-lMO-qdP2y5vmimTgfGG2HWSy8l7Bp3WtXiRSndtieH07Hc8hFzcM5OaYnz0G4BH
         sync: false
