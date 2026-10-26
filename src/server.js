@@ -7,6 +7,7 @@ app.use(express.json({ limit: '32kb' }));
 
 const port = Number(process.env.PORT || 3000);
 const apiKey = process.env.API_KEY;
+const monitorToken = process.env.MONITOR_TOKEN;
 const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
 const discordEvents = new Set((process.env.DISCORD_EVENTS || 'chat,gift,member,social,subscribe,streamEnd')
   .split(',').map((event) => event.trim()).filter(Boolean));
@@ -15,9 +16,9 @@ const maxConnections = Math.max(1, Number(process.env.MAX_CONNECTIONS || 10));
 const streams = new Map();
 
 function authorize(req, res, next) {
-  if (!apiKey) return next();
   const supplied = req.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (supplied !== apiKey) return res.status(401).json({ error: 'Unauthorized' });
+  if (!apiKey && !monitorToken) return next();
+  if (supplied !== apiKey && supplied !== monitorToken) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 function normalizeUsername(value) {
@@ -38,10 +39,10 @@ function formatDiscordData(data) {
   return text.length > 3_800 ? text.slice(0, 3_797) + '...' : text;
 }
 async function postToDiscord(stream, type, data) {
-  if (!discordWebhookUrl || !discordEvents.has(type)) return;
+  if (!discordWebhookUrl || (type !== 'connected' && !discordEvents.has(type))) return;
   const body = {
     embeds: [{
-      title: 'TikTok LIVE · ' + type,
+      title: type === 'connected' ? '🔴 ChilledLuck is LIVE' : 'TikTok LIVE · ' + type,
       description: '```json\n' + formatDiscordData(data) + '\n```',
       color: type === 'gift' ? 0xF1C40F : type === 'chat' ? 0x5865F2 : 0x2ECC71,
       footer: { text: '@' + stream.username },
@@ -88,29 +89,6 @@ function publish(stream, type, data = {}) {
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api', authorize);
-
-app.post('/api/test/discord', async (_req, res) => {
-  if (!discordWebhookUrl) return res.status(503).json({ error: 'Discord webhook is not configured' });
-  try {
-    const response = await fetch(discordWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: 'Test message: TikTok LIVE Discord webhook delivery check.',
-        allowed_mentions: { parse: [] }
-      }),
-      signal: AbortSignal.timeout(8_000)
-    });
-    if (!response.ok) {
-      console.error('Discord test webhook returned HTTP ' + response.status);
-      return res.status(502).json({ error: 'Discord webhook delivery failed' });
-    }
-    return res.json({ status: 'sent' });
-  } catch (error) {
-    console.error('Discord test webhook request failed:', error?.message || error);
-    return res.status(502).json({ error: 'Discord webhook delivery failed' });
-  }
-});
 
 app.get('/api/live', (_req, res) => {
   res.json({ streams: [...streams.values()].map(publicState), maxConnections });
@@ -216,3 +194,4 @@ async function shutdown() {
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
