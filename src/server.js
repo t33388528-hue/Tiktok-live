@@ -9,7 +9,7 @@ const port = Number(process.env.PORT || 3000);
 const apiKey = process.env.API_KEY;
 const monitorToken = process.env.MONITOR_TOKEN;
 const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
-const discordEvents = new Set((process.env.DISCORD_EVENTS || 'chat,gift,member,social,subscribe,streamEnd')
+const discordEvents = new Set((process.env.DISCORD_EVENTS || 'gift,social,subscribe,streamEnd')
   .split(',').map((event) => event.trim()).filter(Boolean));
 let discordQueue = Promise.resolve();
 const maxConnections = Math.max(1, Number(process.env.MAX_CONNECTIONS || 10));
@@ -51,7 +51,7 @@ function liveNotificationEmbed(username, test = false) {
   };
 }
 async function postToDiscord(stream, type, data) {
-  if (!discordWebhookUrl || (type !== 'connected' && !discordEvents.has(type))) return;
+  if (!discordWebhookUrl || (type !== 'connected' && !discordEvents.has(type))) return false;
   const embed = type === 'connected'
     ? liveNotificationEmbed(stream.username)
     : {
@@ -78,7 +78,10 @@ async function postToDiscord(stream, type, data) {
       console.error('Discord webhook request failed:', error?.message || error);
       return;
     }
-    if (response.ok) return;
+    if (response.ok) {
+      if (type === 'connected') console.log(`Discord LIVE notification delivered for @${stream.username}`);
+      return true;
+    }
     if (response.status === 429 && attempt < 3) {
       let retryMs = 1_000;
       try {
@@ -92,14 +95,27 @@ async function postToDiscord(stream, type, data) {
     return;
   }
 }
-function publish(stream, type, data = {}) {
+function notifyLive(stream) {
+  if (stream.liveNotificationSent) return Promise.resolve(true);
+  if (stream.liveNotificationPromise) return stream.liveNotificationPromise;
+  stream.liveNotificationPromise = postToDiscord(stream, 'connected', {})
+    .then((delivered) => {
+      if (delivered) stream.liveNotificationSent = true;
+      return delivered;
+    })
+    .finally(() => { stream.liveNotificationPromise = null; });
+  return stream.liveNotificationPromise;
+}
+function publish(stream, type, data = {}, notifyDiscord = true) {
   const payload = JSON.stringify({ type, username: stream.username, timestamp: new Date().toISOString(), data });
   for (const client of stream.clients) {
     if (!client.writableEnded) client.write(`event: ${type}\ndata: ${payload}\n\n`);
   }
-  discordQueue = discordQueue.then(() => postToDiscord(stream, type, data)).catch((error) => {
-    console.error('Discord webhook delivery failed:', error?.message || error);
-  });
+  if (notifyDiscord) {
+    discordQueue = discordQueue.then(() => postToDiscord(stream, type, data)).catch((error) => {
+      console.error('Discord webhook delivery failed:', error?.message || error);
+    });
+  }
 }
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
@@ -143,7 +159,10 @@ app.post('/api/live/:username/connect', async (req, res) => {
   }
   const existing = streams.get(username);
   if (existing?.connecting) return res.status(202).json(publicState(existing));
-  if (existing?.connection?.isConnected) return res.json(publicState(existing));
+  if (existing?.connection?.isConnected) {
+    if (!existing.liveEnded) await notifyLive(existing);
+    return res.json(publicState(existing));
+  }
   if (streams.size >= maxConnections && !existing) {
     return res.status(429).json({ error: `Connection limit reached (${maxConnections})` });
   }
@@ -155,9 +174,17 @@ app.post('/api/live/:username/connect', async (req, res) => {
   streams.set(username, stream);
   for (const event of ['chat', 'gift', 'like', 'member', 'social', 'roomUser', 'questionNew', 'subscribe', 'streamEnd', 'connected', 'disconnected']) {
     stream.connection.on(event, (data) => {
-      if (event === 'connected') stream.startedAt = new Date().toISOString();
+      if (event === 'connected') {
+        stream.startedAt = new Date().toISOString();
+        stream.liveEnded = false;
+        void notifyLive(stream);
+      }
       if (event === 'disconnected' || event === 'streamEnd') stream.startedAt = null;
-      publish(stream, event, data && typeof data === 'object' ? data : { value: data });
+      if (event === 'streamEnd') {
+        stream.liveEnded = true;
+        stream.liveNotificationSent = false;
+      }
+      publish(stream, event, data && typeof data === 'object' ? data : { value: data }, event !== 'connected');
     });
   }
   stream.connection.on('error', (error) => {
@@ -168,6 +195,8 @@ app.post('/api/live/:username/connect', async (req, res) => {
     await stream.connection.connect();
     stream.connecting = false;
     stream.startedAt ||= new Date().toISOString();
+    stream.liveEnded = false;
+    await notifyLive(stream);
     return res.status(201).json(publicState(stream));
   } catch (error) {
     stream.connecting = false;
