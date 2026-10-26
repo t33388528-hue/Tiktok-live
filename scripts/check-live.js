@@ -19,7 +19,7 @@ for (let attempt = 1; attempt <= 3; attempt += 1) {
       signal: AbortSignal.timeout(45_000)
     });
 
-    if (response.status === 502) {
+    if (response.status === 502 && response.headers.get('content-type')?.includes('application/json')) {
       console.log(`@${username} is offline; the next scheduled check will retry.`);
       process.exit(0);
     }
