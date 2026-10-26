@@ -12,7 +12,7 @@ const streams = new Map();
 
 function authorize(req, res, next) {
   if (!apiKey) return next();
-  const supplied = req.get('authorization')?.replace(/^Bearer\\s+/i, '');
+  const supplied = req.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (supplied !== apiKey) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
@@ -32,7 +32,7 @@ function publicState(stream) {
 function publish(stream, type, data = {}) {
   const payload = JSON.stringify({ type, username: stream.username, timestamp: new Date().toISOString(), data });
   for (const client of stream.clients) {
-    if (!client.writableEnded) client.write(`event: ${type}\\ndata: ${payload}\\n\\n`);
+    if (!client.writableEnded) client.write(`event: ${type}\ndata: ${payload}\n\n`);
   }
 }
 
@@ -107,9 +107,9 @@ app.get('/api/live/:username/events', (req, res) => {
     'X-Accel-Buffering': 'no'
   });
   res.flushHeaders();
-  res.write(`event: ready\\ndata: ${JSON.stringify(publicState(stream))}\\n\\n`);
+  res.write(`event: ready\ndata: ${JSON.stringify(publicState(stream))}\n\n`);
   stream.clients.add(res);
-  const heartbeat = setInterval(() => { if (!res.writableEnded) res.write(': keep-alive\\n\\n'); }, 25_000);
+  const heartbeat = setInterval(() => { if (!res.writableEnded) res.write(': keep-alive\n\n'); }, 25_000);
   req.on('close', () => { clearInterval(heartbeat); stream.clients.delete(res); });
 });
 
