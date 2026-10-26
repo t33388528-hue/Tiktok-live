@@ -38,16 +38,31 @@ function formatDiscordData(data) {
   const text = JSON.stringify(data, null, 2) || '{}';
   return text.length > 3_800 ? text.slice(0, 3_797) + '...' : text;
 }
+function liveNotificationEmbed(username, test = false) {
+  const normalizedUsername = normalizeUsername(username);
+  const liveUrl = `https://www.tiktok.com/@${encodeURIComponent(normalizedUsername)}/live`;
+  return {
+    title: `🔴 @${normalizedUsername} is LIVE${test ? ' (TEST)' : ''}`,
+    url: liveUrl,
+    description: `[Watch @${normalizedUsername} on TikTok](${liveUrl})${test ? '\n\nThis is a test notification.' : ''}`,
+    color: 0xE74C3C,
+    footer: { text: '@' + normalizedUsername },
+    timestamp: new Date().toISOString()
+  };
+}
 async function postToDiscord(stream, type, data) {
   if (!discordWebhookUrl || (type !== 'connected' && !discordEvents.has(type))) return;
-  const body = {
-    embeds: [{
-      title: type === 'connected' ? '🔴 ChilledLuck is LIVE' : 'TikTok LIVE · ' + type,
+  const embed = type === 'connected'
+    ? liveNotificationEmbed(stream.username)
+    : {
+      title: 'TikTok LIVE · ' + type,
       description: '```json\n' + formatDiscordData(data) + '\n```',
       color: type === 'gift' ? 0xF1C40F : type === 'chat' ? 0x5865F2 : 0x2ECC71,
       footer: { text: '@' + stream.username },
       timestamp: new Date().toISOString()
-    }],
+    };
+  const body = {
+    embeds: [embed],
     allowed_mentions: { parse: [] }
   };
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -97,7 +112,7 @@ app.post('/api/test/discord', async (_req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        content: 'Test message: TikTok LIVE Discord webhook delivery check.',
+        embeds: [liveNotificationEmbed('chilledluck', true)],
         allowed_mentions: { parse: [] }
       }),
       signal: AbortSignal.timeout(8_000)
