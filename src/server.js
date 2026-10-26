@@ -7,6 +7,10 @@ app.use(express.json({ limit: '32kb' }));
 
 const port = Number(process.env.PORT || 3000);
 const apiKey = process.env.API_KEY;
+const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+const discordEvents = new Set((process.env.DISCORD_EVENTS || 'chat,gift,member,social,subscribe,streamEnd')
+  .split(',').map((event) => event.trim()).filter(Boolean));
+let discordQueue = Promise.resolve();
 const maxConnections = Math.max(1, Number(process.env.MAX_CONNECTIONS || 10));
 const streams = new Map();
 
@@ -29,11 +33,57 @@ function publicState(stream) {
     error: stream.error || null
   };
 }
+function formatDiscordData(data) {
+  const text = JSON.stringify(data, null, 2) || '{}';
+  return text.length > 3_800 ? text.slice(0, 3_797) + '...' : text;
+}
+async function postToDiscord(stream, type, data) {
+  if (!discordWebhookUrl || !discordEvents.has(type)) return;
+  const body = {
+    embeds: [{
+      title: 'TikTok LIVE · ' + type,
+      description: '```json\n' + formatDiscordData(data) + '\n```',
+      color: type === 'gift' ? 0xF1C40F : type === 'chat' ? 0x5865F2 : 0x2ECC71,
+      footer: { text: '@' + stream.username },
+      timestamp: new Date().toISOString()
+    }],
+    allowed_mentions: { parse: [] }
+  };
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(discordWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8_000)
+      });
+    } catch (error) {
+      console.error('Discord webhook request failed:', error?.message || error);
+      return;
+    }
+    if (response.ok) return;
+    if (response.status === 429 && attempt < 3) {
+      let retryMs = 1_000;
+      try {
+        const result = await response.json();
+        retryMs = Math.min(10_000, Math.ceil(Number(result.retry_after || 1) * 1_000));
+      } catch { /* use fallback delay */ }
+      await new Promise((resolve) => setTimeout(resolve, retryMs));
+      continue;
+    }
+    console.error('Discord webhook returned HTTP ' + response.status);
+    return;
+  }
+}
 function publish(stream, type, data = {}) {
   const payload = JSON.stringify({ type, username: stream.username, timestamp: new Date().toISOString(), data });
   for (const client of stream.clients) {
     if (!client.writableEnded) client.write(`event: ${type}\ndata: ${payload}\n\n`);
   }
+  discordQueue = discordQueue.then(() => postToDiscord(stream, type, data)).catch((error) => {
+    console.error('Discord webhook delivery failed:', error?.message || error);
+  });
 }
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
