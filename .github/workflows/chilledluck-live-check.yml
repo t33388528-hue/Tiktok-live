@@ -2,7 +2,7 @@ name: ChilledLuck LIVE check
 
 on:
   schedule:
-    - cron: '2-57/5 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       test_discord:
@@ -48,4 +48,3 @@ jobs:
             if (!response.ok) throw new Error(`Render returned HTTP ${response.status}: ${body}`);
             console.log(body);
           '
-
